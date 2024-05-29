@@ -89,7 +89,7 @@ int RemoteDisk::read_disk_section(int cylinder, int sector, char* buffer) {
     }
     size_t data_size = 0;
     bytepack_unpack_bytes(&bytepack, buffer, &data_size);
-    return sector_size != data_size;
+    return static_cast<size_t>(sector_size) != data_size ? -1 : 0;
 }
 
 int RemoteDisk::write_disk_section(int cylinder, int sector, int data_size, const char* data) {

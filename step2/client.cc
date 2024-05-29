@@ -207,6 +207,7 @@ int main(int argc, char *argv[]) {
             std::cout << msg(result);
         } else if (cmd == "del") { // delall
             std::string filename;
+            std::cin >> filename;
             bytepack_pack(&request, "is", OP_DELALL, filename.c_str());
             bytepack_send(server_fd, &request);
             bytepack_recv(server_fd, &response);
@@ -310,6 +311,7 @@ void print_help() {
               << "  cd <dirname>\n"
               << "  ls\n"
               << "  cat <filename>\n"
+              << "  r <filename> <offset> <size>\n"
               << "  w <filename> <offset> <data>: overwrite file\n"
               << "  i <filename> <offset> <data>: insert\n"
               << "  d <filename> <offset> <size>: delete from file\n"
@@ -319,7 +321,6 @@ void print_help() {
               << "  chown <filename> <owner>\n"
               << "  adduser <username>\n"
               << "  lsuser: list all users\n"
-              << "  read <filename> <offset> <size>\n"
               << "  del <filename>: delete all contents in <filename>\n"
               << "  flush: flush cached blocks to disk\n"
               << "  rn <oldname> <newname>\n"

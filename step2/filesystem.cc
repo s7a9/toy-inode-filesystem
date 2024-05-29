@@ -293,7 +293,7 @@ void FileSystem::format_() {
     block_mgr_ = new BlockManager(disk_, true);
     // Create root inode
     InodeFile *root = new InodeFile(block_mgr_);
-    blockid_t root_inode = root->create(0, 033, TYPE_DIR);
+    blockid_t root_inode = root->create(0, 010, TYPE_DIR);
     if (root_inode != ROOT_INODE) {
         std::cerr << "format_: Root inode mismatch: " << root_inode << std::endl;
         exit(1);
