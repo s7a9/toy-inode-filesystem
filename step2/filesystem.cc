@@ -79,6 +79,9 @@ ecode_t WorkingDir::create_file(const char* filename) {
     // std::cout << "resolved path: " << node->file->inode_id() << std::endl;
     TRYLOCK(true);
     std::string name(filename + idx, len - idx);
+    if (name.length() >= MAX_FILENAME_LEN) {
+        UNLOCK(ERROR_INVALID_NAME);
+    }
     CHKRET(node->dir->lookup(name.c_str()) == 0, ERROR_EXIST);
     blockid_t file_inode = active_file_.create(user_, 033, TYPE_FILE);
     CHKRET(file_inode != 0, ERROR_INVALID);
@@ -95,6 +98,9 @@ ecode_t WorkingDir::create_dir(const char* dirname) {
     CHKRET(idx < len, ERROR_EXIST);
     TRYLOCK(true);
     std::string name(dirname + idx, len - idx);
+    if (name.length() >= MAX_FILENAME_LEN) {
+        UNLOCK(ERROR_INVALID_NAME);
+    }
     CHKRET(node->dir->lookup(name.c_str()) == 0, ERROR_EXIST);
     blockid_t dir_inode = active_file_.create(user_, 033, TYPE_DIR);
     CHKRET(dir_inode != 0, ERROR_INVALID);
@@ -264,6 +270,9 @@ WorkingDir* FileSystem::open_working_dir(const char* username) {
 }
 
 ecode_t FileSystem::add_user(const char* username, uint32_t& uid) {
+    if (strlen(username) >= MAX_USERNAME_LEN) {
+        return ERROR_INVALID_NAME;
+    }
     uid = userfile_->add_user(username);
     if (uid == 0) {
         return ERROR_EXIST;

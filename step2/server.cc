@@ -12,6 +12,7 @@ std::unique_ptr<RemoteDisk> disk;
 std::unique_ptr<FileSystem> fs;
 
 constexpr int FLUSH_INTERVAL = 16;
+constexpr size_t BUFFER_SIZE = 4096;
 
 int server_fd = -1;
 int flush_counter = FLUSH_INTERVAL;
@@ -80,11 +81,14 @@ void* handler(void* agrs) {
             fs->flush();
             flush_counter = FLUSH_INTERVAL;
         }
-        char buffer[std::max(MAX_FILENAME_LEN, MAX_USERNAME_LEN)];
+        char buffer[BUFFER_SIZE];
         bytepack_reset(&request);
         bytepack_reset(&response);
         bytepack_recv(client_fd, &request);
         if (request.size == 0) break;
+        if (request.size >= BUFFER_SIZE) {
+            continue;
+        }
         // std::cout << "Request from " << client_ip << std::endl;
         // bytepack_dbg_print(&request);
         Operation op;
@@ -304,7 +308,7 @@ void* handler(void* agrs) {
             fs->flush();
             continue;
         } case OP_RENAME:{
-            char newname[MAX_FILENAME_LEN];
+            char newname[BUFFER_SIZE];
             bytepack_unpack(&request, "ss", buffer, newname);
             ret = wd->rename(buffer, newname);
             PACK_ERR(ret);

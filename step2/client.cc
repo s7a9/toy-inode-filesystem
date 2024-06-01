@@ -304,6 +304,7 @@ const char *msg(ecode_t code) {
         case ERROR_USER_NOT_FOUND: return "User not found";
         case ERROR_BUSY: return "Device or resource busy";
         case ERROR_INVALID_PATH: return "Invalid path";
+        case ERROR_INVALID_NAME: return "Invalid name";
         default: return "Unknown error";
     }
     return nullptr;

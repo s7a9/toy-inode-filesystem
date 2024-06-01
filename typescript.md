@@ -49,4 +49,4 @@ f
 FS >>
 ```
 
-For further run tests, you can refer to the Experiment section in my report `Project3report.pdf`.
+For other run tests, you can refer to the Experiment section in my report `Project3report.pdf`.
