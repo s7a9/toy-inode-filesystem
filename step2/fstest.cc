@@ -193,7 +193,7 @@ class FileSystemTest : public TestBase {
 public:
     int run() override {
         out() << "start testing..." << std::endl;
-        disk = new RemoteDisk("127.0.0.1", 9348);
+        disk = new RemoteDisk("127.0.0.1", 10383);
         if (!disk->open()) {
             out() << "Failed to open disk" << std::endl;
             return 1;
@@ -259,7 +259,7 @@ public:
                 std::string dirname;
                 std::cin >> dirname;
                 wd->create_dir(dirname.c_str());
-            } else if (line == "list") {
+            } else if (line == "ls") {
                 std::vector<std::string> list;
                 wd->list_dir(list);
                 for (auto& name : list) {
@@ -304,7 +304,7 @@ public:
                 std::cin >> uid;
                 fs->remove_user(uid);
                 std::cout << "Removed user " << uid << std::endl;
-            } else if (line == "listusers") {
+            } else if (line == "lsuser") {
                 std::vector<std::string> list;
                 fs->list_users(list);
                 for (auto& name : list) {

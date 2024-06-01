@@ -62,91 +62,116 @@ void FileSystem::node_t::unlock() {
     sem_post(&sem);
 }
 
-#define TRYLOCK(ACCESS) if (!node_->try_lock(ACCESS)) { std::cerr << "lock failed\n"; return ERROR_BUSY; }
-#define CHKRET(cond, ERR) if (!(cond)) { node_->unlock(); std::cerr << "ecode: " << ERR << std::endl; return ERR; }
+#define TRYLOCK(ACCESS) if (!node->try_lock(ACCESS)) { \
+    std::cerr << "lock failed\n"; \
+    fs_->release_node_(node); \
+    return ERROR_BUSY; }
+#define UNLOCK(RET) { if (node) { node->unlock(); } fs_->release_node_(node); return RET; }
+#define CHKRET(cond, ERR) if (!(cond)) { std::cerr << "ecode: " << ERR << std::endl; UNLOCK(ERR); }
+
 
 ecode_t WorkingDir::create_file(const char* filename) {
+    ecode_t ret = 0;
+    size_t len = strlen(filename), idx;
+    ret = fs_->resolve_path_(filename, len, this, node, idx, false);
+    CHKRET(ret == 0, ret);
+    CHKRET(idx < len, ERROR_EXIST);
+    // std::cout << "resolved path: " << node->file->inode_id() << std::endl;
     TRYLOCK(true);
-    CHKRET(node_->dir->lookup(filename) == 0, ERROR_EXIST);
+    std::string name(filename + idx, len - idx);
+    CHKRET(node->dir->lookup(name.c_str()) == 0, ERROR_EXIST);
     blockid_t file_inode = active_file_.create(user_, 033, TYPE_FILE);
-    std::cout << "create file: " << filename << " inode: " << file_inode << std::endl;
     CHKRET(file_inode != 0, ERROR_INVALID);
     active_file_.close();
-    ecode_t ret = node_->dir->add_entry(filename, file_inode);
-    node_->unlock();
-    return ret;
+    ret = node->dir->add_entry(name.c_str(), file_inode);
+    UNLOCK(ret);
 }
 
 ecode_t WorkingDir::create_dir(const char* dirname) {
-    ecode_t ret;
+    ecode_t ret = 0;
+    size_t len = strlen(dirname), idx;
+    ret = fs_->resolve_path_(dirname, len, this, node, idx, false);
+    CHKRET(ret == 0, ret);
+    CHKRET(idx < len, ERROR_EXIST);
     TRYLOCK(true);
-    CHKRET(node_->dir->lookup(dirname) == 0, ERROR_EXIST);
+    std::string name(dirname + idx, len - idx);
+    CHKRET(node->dir->lookup(name.c_str()) == 0, ERROR_EXIST);
     blockid_t dir_inode = active_file_.create(user_, 033, TYPE_DIR);
     CHKRET(dir_inode != 0, ERROR_INVALID);
     { // flush directoy info into file
-        Directory dir(&active_file_, node_->file->inode_id());
+        Directory dir(&active_file_, node->file->inode_id());
     }
     active_file_.close();
-    std::cout << "create dir: " << dirname << " inode: " << dir_inode << std::endl;
-    ret = node_->dir->add_entry(dirname, dir_inode);
-    node_->unlock();
-    return ret;
+    ret = node->dir->add_entry(name.c_str(), dir_inode);
+    UNLOCK(ret);
 }
 
 ecode_t WorkingDir::remove(const char* name) {
+    ecode_t ret = 0;
+    size_t len = strlen(name), idx;
+    ret = fs_->resolve_path_(name, len, this, node, idx, true);
+    CHKRET(ret == 0, ret);
+    CHKRET(idx < len, ERROR_NOT_FOUND);
     TRYLOCK(true);
-    blockid_t inode = node_->dir->lookup(name);
+    std::string filename(name + idx, len - idx);
+    blockid_t inode = node->dir->lookup(filename.c_str());
     CHKRET(inode != 0, ERROR_NOT_FOUND);
-    active_file_.open(inode);
-    if (active_file_.inode()->type == TYPE_DIR) {
+    CHKRET(active_file_.open(inode), ERROR_INVALID);
+    if (active_file_.inode()->type != TYPE_FILE) {
         active_file_.close();
-        node_->unlock();
-        return ERROR_NOT_FILE;
+        UNLOCK(ERROR_NOT_FILE);
     }
     if (!test_permission(active_file_.inode(), user_, true)) {
         active_file_.close();
-        node_->unlock();
-        return ERROR_PERMISSION;
+        UNLOCK(ERROR_PERMISSION);
     }
-    node_->dir->remove_entry(name);
+    node->dir->remove_entry(filename.c_str());
     active_file_.removeall();
     active_file_.close();
     fs_->block_mgr()->free_block(inode);
-    node_->unlock();
-    return 0;
+    UNLOCK(0);
 }
 
 ecode_t WorkingDir::remove_dir(const char* dirname) {
-    ecode_t ret;
+    ecode_t ret = 0;
+    size_t len = strlen(dirname), idx;
+    ret = fs_->resolve_path_(dirname, len, this, node, idx, true);
+    CHKRET(ret == 0, ret);
+    CHKRET(idx < len, ERROR_NOT_FOUND);
     TRYLOCK(true);
-    blockid_t inode = node_->dir->lookup(dirname);
-    CHKRET(inode != 0, ERROR_NOT_FOUND);
+    CHKRET(node->dir, ERROR_NOT_DIR);
+    std::string name(dirname + idx, len - idx);
+    blockid_t inode = node->dir->lookup(name.c_str());
     ret = fs_->remove_(inode, user_);
     if (ret == 0) {
-        node_->dir->remove_entry(dirname);
+        node->dir->remove_entry(name.c_str());
     }
-    node_->unlock();
-    return ret;
+    UNLOCK(ret);
 }
 
 ecode_t WorkingDir::change_dir(const char* path) {
-    ecode_t ret;
+    ecode_t ret = 0;
+    size_t len = strlen(path), idx;
+    ret = fs_->resolve_path_(path, len, this, node, idx, false);
+    CHKRET(ret == 0, ret);
+    CHKRET(idx == len, ERROR_NOT_FOUND);
+    CHKRET(node->dir, ERROR_NOT_DIR);
     TRYLOCK(false);
-    blockid_t inode = node_->dir->lookup(path);
-    CHKRET(inode != 0, ERROR_NOT_FOUND);
-    ret = fs_->change_working_dir_(inode, this);
-    node_->unlock();
-    return ret;
+    ret = fs_->change_working_dir_(node, this);
+    UNLOCK(ret);
 }
 
 ecode_t WorkingDir::list_dir(std::vector<std::string>& list) {
-    TRYLOCK(false);
+    if (!node_->try_lock(false)) {
+        return ERROR_BUSY;
+    }
     node_->dir->list(list);
     node_->unlock();
     return 0;
 }
 
 ecode_t WorkingDir::chmod(const char* filename, uint16_t mode) {
+    node_t* node = node_;
     TRYLOCK(false);
     blockid_t inode = node_->dir->lookup(filename);
     CHKRET(inode != 0, ERROR_NOT_FOUND);
@@ -159,6 +184,7 @@ ecode_t WorkingDir::chmod(const char* filename, uint16_t mode) {
 }
 
 ecode_t WorkingDir::chown(const char* filename, uint32_t owner) {
+    node_t* node = node_;
     TRYLOCK(false);
     blockid_t inode = node_->dir->lookup(filename);
     CHKRET(inode != 0, ERROR_NOT_FOUND);
@@ -171,15 +197,18 @@ ecode_t WorkingDir::chown(const char* filename, uint32_t owner) {
 }
 
 ecode_t WorkingDir::acquire_file(const char* filename, bool write) {
+    ecode_t ret = 0;
+    size_t len = strlen(filename), idx;
+    ret = fs_->resolve_path_(filename, len, this, node, idx, false);
+    CHKRET(ret == 0, ret);
+    CHKRET(idx == len, ERROR_NOT_FOUND);
     TRYLOCK(write);
-    ecode_t ret = open_file_(filename, write);
-    if (ret != 0) {
-        node_->unlock();
-    }
-    return ret;
+    ++node->refcnt;
+    return 0;
 }
 
 ecode_t WorkingDir::rename(const char* oldname, const char* newname) {
+    node_t* node = node_;
     TRYLOCK(true);
     blockid_t inode = node_->dir->lookup(oldname);
     CHKRET(inode != 0, ERROR_NOT_FOUND);
@@ -194,23 +223,14 @@ ecode_t WorkingDir::rename(const char* oldname, const char* newname) {
     return 0;
 }
 
-void WorkingDir::release_file() {
-    active_file_.close();
-    node_->unlock();
+ecode_t WorkingDir::current_dir(std::string& path) {
+    return fs_->get_full_path_(node_, path);
 }
 
-ecode_t WorkingDir::open_file_(const char* filename, bool write) {
-    blockid_t inode = node_->dir->lookup(filename);
-    CHKRET(inode != 0, ERROR_NOT_FOUND);
-    if (!active_file_.open(inode)) {
-        return ERROR_INVALID;
-    }
-    if (!test_permission(active_file_.inode(), user_, write)) {
-        active_file_.close();
-        return ERROR_PERMISSION;
-    }
-    // std::cout << "open file: " << filename << " inode: " << inode << std::endl;
-    return 0;
+void WorkingDir::release_file() {
+    active_file_.close();
+    if (node) --node->refcnt;
+    UNLOCK();
 }
 
 FileSystem::FileSystem(RemoteDisk* disk, bool create): 
@@ -366,39 +386,29 @@ FileSystem::node_t* FileSystem::load_node_(blockid_t inode) {
     return node;
 }
 
-void FileSystem::release_node_(node_t* node) {
-    if (node->refcnt == 0) {
+void FileSystem::release_node_(node_t*& node) {
+    if (node == nullptr) {
+        return;
+    }
+    if (node->refcnt <= 0) {
         sem_wait(&lock_);
         nodes_.erase(node->file->inode_id());
         sem_post(&lock_);
         delete node;
     }
+    node = nullptr;
 }
 
-ecode_t FileSystem::change_working_dir_(blockid_t block, WorkingDir* wd) {
-    if (block == 0) {
-        return ERROR_NOT_FOUND;
-    }
+ecode_t FileSystem::change_working_dir_(node_t* new_node, WorkingDir* wd) {
     auto node = wd->node_;
-    auto new_node = load_node_(block);
     if (node == new_node) {
         return 0;
     }
-    if (new_node == nullptr) {
-        std::cerr << "change_working_dir_: Failed to load node: " << block << std::endl;
-        return ERROR_INVALID;
-    }
-    if (!test_permission(new_node->file->inode(), wd->user_, false)) {
-        std::cerr << "change_working_dir_: Permission denied: " << block << std::endl;
-        release_node_(new_node);
-        return ERROR_PERMISSION;
-    }
     if (new_node->dir == nullptr) {
-        std::cerr << "change_working_dir_: Not a directory: " << block << std::endl;
+        std::cerr << "change_working_dir_: Not a directory: " << new_node->file->inode_id() << std::endl;
         release_node_(new_node);
         return ERROR_NOT_DIR;
     }
-    // std::cout << "refcnt: " << node->refcnt << std::endl;
     --node->refcnt;
     node->unlock(); // acquired in WorkingDir::change_dir
     ++new_node->refcnt;
@@ -433,6 +443,82 @@ ecode_t FileSystem::walk_and_acquire_(node_t *node, std::vector<node_t*> &nodes)
                 return ret;
             }
         }
+    }
+    return 0;
+}
+
+ecode_t FileSystem::resolve_path_(const char* path, size_t len, WorkingDir* wd, 
+                                  node_t*& node, size_t& idx, bool need_last) {
+    if (len == 0) return ERROR_INVALID_PATH;
+    node = wd->node_;
+    idx = 0;
+    if (path[0] == '/') {
+        node = load_node_(ROOT_INODE);
+        idx = 1;
+    }
+    while (idx < len) {
+        size_t j = idx;
+        while (j < len && path[j] != '/') {
+            j++;
+        }
+        if (j == idx) return ERROR_INVALID_PATH;
+        std::string name(path + idx, j - idx);
+        blockid_t inode = node->dir->lookup(name.c_str());
+        // std::cout << "Current position: " << name << " : " << inode << std::endl;
+        if (inode == 0) break;
+        auto new_node = load_node_(inode);
+        if (new_node == nullptr) {
+            std::cerr << "resolve_path_: Failed to load node: " << inode << std::endl;
+            return ERROR_INVALID;
+        }
+        if (!test_permission(new_node->file->inode(), wd->user_, false)) {
+            std::cerr << "resolve_path_: Permission denied: " << inode << std::endl;
+            release_node_(new_node);
+            return ERROR_PERMISSION;
+        }
+        if (need_last && j == len) {
+            release_node_(new_node);
+            break;
+        }
+        release_node_(node);
+        node = new_node;
+        idx = j + 1;
+    }
+    for (size_t i = idx; i < len; ++i) {
+        if (path[i] == '/') {
+            return ERROR_INVALID_PATH;
+        }
+    }
+    if (idx > len) idx = len;
+    return 0;
+}
+
+ecode_t FileSystem::get_full_path_(node_t* node, std::string& path) {
+    if (node->file->inode_id() == ROOT_INODE) {
+        path = "/";
+        return 0;
+    }
+    std::vector<std::string> names;
+    while (node->file->inode_id() != ROOT_INODE) {
+        auto parent_id = node->dir->lookup("..");
+        auto parent = load_node_(parent_id);
+        if (parent == nullptr) {
+            std::cerr << "get_full_path_: Failed to load parent node: " << parent_id << std::endl;
+            return ERROR_INVALID;
+        }
+        std::string name = parent->dir->lookup(node->file->inode_id());
+        if (name.empty()) {
+            std::cerr << "get_full_path_: Failed to lookup name: " << node->file->inode_id() << std::endl;
+            release_node_(parent);
+            return ERROR_INVALID;
+        }
+        names.push_back(name);
+        release_node_(node);
+        node = parent;
+    }
+    path = "/";
+    for (auto it = names.rbegin(); it != names.rend(); ++it) {
+        path += *it + "/";
     }
     return 0;
 }

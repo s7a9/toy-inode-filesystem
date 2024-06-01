@@ -22,6 +22,7 @@ public:
     ~Directory();
 
     blockid_t lookup(const char* filename) const;
+    const char* lookup(blockid_t inode) const;
     int add_entry(const char* filename, blockid_t inode);
     int remove_entry(const char* filename);
     int list(std::vector<std::string>& list) const;

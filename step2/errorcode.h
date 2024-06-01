@@ -17,6 +17,7 @@ constexpr ecode_t ERROR_BUSY = -14;
 constexpr ecode_t ERROR_EXIST = -15;
 constexpr ecode_t ERROR_USER_NOT_FOUND = -16;
 constexpr ecode_t ERROR_INVALID_OP = -17;
+constexpr ecode_t ERROR_INVALID_PATH = -18;
 
 enum Operation : int {
     OP_NOPE = 0,

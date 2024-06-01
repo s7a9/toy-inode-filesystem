@@ -36,6 +36,15 @@ blockid_t Directory::lookup(const char* filename) const {
     return 0;
 }
 
+const char* Directory::lookup(blockid_t inode) const {
+    for (const DirectoryEntry& entry : entries_) {
+        if (entry.inode == inode) {
+            return entry.filename;
+        }
+    }
+    return nullptr;
+}
+
 int Directory::add_entry(const char* filename, blockid_t inode) {
     size_t len = strlen(filename);
     if (len >= MAX_FILENAME_LEN) {

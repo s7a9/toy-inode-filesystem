@@ -122,6 +122,12 @@ void* handler(void* agrs) {
             bytepack_unpack(&request, "s", buffer);
             ret = wd->change_dir(buffer);
             PACK_ERR(ret);
+            if (ret == 0) {
+                std::string full_path;
+                wd->current_dir(full_path);
+                bytepack_pack(&response, "l", full_path.size() + 1);
+                bytepack_pack(&response, "s", full_path.c_str());
+            }
             break;
         } case OP_LS: {
             std::vector<std::string> list;

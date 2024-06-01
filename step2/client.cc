@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     int server_fd = connect_to_server(argv[1], atoi(argv[2]));
-    std::string line;
+    std::string line, full_path = "/";
     bytepack_t request, response;
     bytepack_init(&request, 1024);
     bytepack_init(&response, 1024);
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     // main loop
     while (true) {
         std::string cmd;
-        std::cout << "\nFS >> ";
+        std::cout << "\nFS " << full_path << " $ ";
         std::cin >> cmd;
         bytepack_reset(&request);
         if (cmd == "format") {
@@ -103,6 +103,13 @@ int main(int argc, char *argv[]) {
             bytepack_recv(server_fd, &response);
             bytepack_unpack(&response, "i", &result);
             std::cout << msg(result);
+            if (result == 0) {
+                size_t len;
+                bytepack_unpack(&response, "l", &len);
+                char path[256];
+                bytepack_unpack(&response, "s", path);
+                full_path = path;
+            }
         } else if (cmd == "chmod") {
             std::string filename;
             int mode;
@@ -296,6 +303,7 @@ const char *msg(ecode_t code) {
         case ERROR_NOT_FILE: return "Not a file";
         case ERROR_USER_NOT_FOUND: return "User not found";
         case ERROR_BUSY: return "Device or resource busy";
+        case ERROR_INVALID_PATH: return "Invalid path";
         default: return "Unknown error";
     }
     return nullptr;

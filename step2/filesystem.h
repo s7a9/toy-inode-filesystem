@@ -33,7 +33,8 @@ public:
     class WorkingDir {
         friend FileSystem;
         WorkingDir(FileSystem* fs, node_t* node, uint32_t user): 
-            user_(user), fs_(fs), node_(node), active_file_(fs->block_mgr()) {}
+            user_(user), fs_(fs), node_(node), node(nullptr), 
+            active_file_(fs->block_mgr()) {}
 
     public:
         ecode_t create_file(const char* filename);
@@ -45,20 +46,19 @@ public:
         ecode_t chmod(const char* name, uint16_t mode);
         ecode_t chown(const char* name, uint32_t owner);
         ecode_t rename(const char* oldname, const char* newname);
+        ecode_t current_dir(std::string& path);
 
         ecode_t acquire_file(const char* filename, bool write);
         void release_file();
         
-        InodeFile& active_file() { return active_file_; }
+        InodeFile& active_file() { return *node->file; }
         FileSystem* fs() const { return fs_; }
         uint32_t user() const { return user_; }
 
     private:
-        ecode_t open_file_(const char* filename, bool write);
-
         uint32_t user_;
         FileSystem* fs_;
-        node_t* node_;
+        node_t* node_, *node; // node is for active_node_
         InodeFile active_file_;
     };
 
@@ -85,10 +85,12 @@ private:
     void close_();
 
     node_t* load_node_(blockid_t inode);
-    void release_node_(node_t* node);
+    void release_node_(node_t*& node);
 
-    ecode_t change_working_dir_(blockid_t inode, WorkingDir* wd);
+    ecode_t change_working_dir_(node_t* new_node, WorkingDir* wd);
     ecode_t walk_and_acquire_(node_t *node, std::vector<node_t*> &nodes);
+    ecode_t resolve_path_(const char* path, size_t len, WorkingDir* wd, node_t*& node, size_t& idx, bool need_last);
+    ecode_t get_full_path_(node_t* node, std::string& path);
 
     ecode_t remove_(blockid_t inode, uint32_t user);
 

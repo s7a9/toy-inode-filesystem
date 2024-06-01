@@ -22,7 +22,7 @@ fstest: fstest.cc blockmgr.o inodefile.o idisk.o filesystem.o userfile.o directo
 	g++ -o ../bin/fstest fstest.cc filesystem.o userfile.o directory.o inodefile.o blockmgr.o idisk.o ../bin/bytepack.o ../bin/network.o -O2 -Wall -fsanitize=address
 
 server: server.cc filesystem.o blockmgr.o inodefile.o idisk.o userfile.o directory.o
-	g++ -o ../bin/FS -I.. server.cc filesystem.o userfile.o directory.o inodefile.o blockmgr.o idisk.o ../bin/bytepack.o ../bin/network.o -O2 -Wall
+	g++ -o ../bin/FS -I.. server.cc filesystem.o userfile.o directory.o inodefile.o blockmgr.o idisk.o ../bin/bytepack.o ../bin/network.o -O2 -Wall -fsanitize=address
 
 client: client.cc
 	g++ -o ../bin/FC -I.. client.cc ../bin/bytepack.o ../bin/network.o -O2 -Wall
