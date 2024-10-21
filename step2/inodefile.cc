@@ -142,7 +142,7 @@ size_t InodeFile::read(char* buf, size_t size, size_t offset) {
     if (inode_block_ == 0) return 0;
     if (offset + size > inode_->size) return 0;
     inode_->atime = time(nullptr);
-    size = std::min(size, inode_->size - offset);
+    size = std::min(size, (size_t)inode_->size - offset);
     size_t read_size = 0;
     size_t index = offset / InodeDataSize;
     size_t offset_in_block = offset % InodeDataSize;
@@ -211,7 +211,7 @@ size_t InodeFile::remove(size_t size, size_t offset) {
     if (inode_block_ == 0) return 0;
     if (offset >= inode_->size) return 0;
     inode_->mtime = inode_->atime = time(nullptr);
-    size = std::min(size, inode_->size - offset);
+    size = std::min(size, (size_t)inode_->size - offset);
     size_t index = offset / InodeDataSize;
     size_t offset_in_block = offset % InodeDataSize;
     size_t remaining_size = inode_->size - offset - size;
@@ -327,7 +327,7 @@ InodeDataBlock* InodeFile::load_data_(size_t index, bool create) {
 
 bool InodeFile::load_entries_() {
     if (inode_block_ == 0) return false;
-    auto data_num = (inode_->size + InodeDataSize - 1) / InodeDataSize;
+    size_t data_num = (inode_->size + InodeDataSize - 1) / InodeDataSize;
     cached_data_.clear();
     if (data_num == 0) return true;
     cached_data_.reserve(data_num);
